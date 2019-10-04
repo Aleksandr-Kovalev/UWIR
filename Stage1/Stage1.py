@@ -2,21 +2,13 @@ import tensorflow as tf
 import numpy as np
 import keras
 import os
-import shutil
 import matplotlib.pyplot as plt
 
-from os import path
 from keras.applications import VGG16
 from keras.preprocessing.image import ImageDataGenerator, load_img, img_to_array
-from keras import models
-from keras import optimizers
-from time import time
-from keras.callbacks import TensorBoard
 from keras.layers import Input, Conv2D, Conv2DTranspose, Dropout, concatenate
 from keras.models import Model
 from keras import backend as K
-from PIL import Image
-from keras.applications.vgg16 import preprocess_input
 from keras.regularizers import l2
 
 #This is a U-net with VGG16 as the encoder, the goal is to train the network
@@ -28,9 +20,20 @@ from keras.regularizers import l2
 #By: Aleksandr Kovalev
 #Date: 9.23.2019
 
+
+# Check if GPU is detected for tensorflow. Creates a graph.
+a = tf.constant([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], shape=[2, 3], name='a')
+b = tf.constant([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], shape=[3, 2], name='b')
+c = tf.matmul(a, b)
+# Creates a session with log_device_placement set to True.
+sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+# Runs the op.
+print(sess.run(c))
+
+
 #size of images for model input (make sure divisible by 8)
-IMG_HEIGHT = 240
-IMG_WIDTH = 240
+IMG_HEIGHT = 400
+IMG_WIDTH = 400
 
 def deprocess_image(x):
     """utility function to convert a float array into a valid uint8 image.
@@ -59,10 +62,6 @@ def deprocess_image(x):
 print("tensorflow version: " + tf. __version__)
 print("numpy version: " + np. __version__)
 print("keras version: " + keras. __version__)
-
-#dataset percentage splits, used to split up the data into different folders
-train_split_pct = 1
-val_split_pct = 0.0
 
 #Dataset Directory SetUp
 #Path where labeled data is collected
@@ -94,11 +93,11 @@ import statistics
 #Image Augmentation
 train_datagen = ImageDataGenerator(
     rescale=1./255,
-    rotation_range=90,
+    rotation_range=180,
     width_shift_range=0.2,
     height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
+    #shear_range=0.2,
+    #zoom_range=0.2,
     horizontal_flip=True,
     vertical_flip=True,
     data_format='channels_last',
@@ -108,7 +107,7 @@ train_datagen = ImageDataGenerator(
 train_org_generator = train_datagen.flow_from_directory(
     train_org_dir,
     target_size=(IMG_HEIGHT, IMG_HEIGHT),
-    #batch_size=10,
+    batch_size=1,
     shuffle=False,
     class_mode=None,
     seed=18) # seed must match, this insures that the augumentation is identical
@@ -117,7 +116,7 @@ train_org_generator = train_datagen.flow_from_directory(
 train_edit_generator = train_datagen.flow_from_directory(
     train_edit_dir,
     target_size=(IMG_HEIGHT, IMG_HEIGHT),
-    #batch_size=10,
+    batch_size=1,
     shuffle=False,
     class_mode=None,
     seed=18)
@@ -171,42 +170,45 @@ reg = l2(0.001)
 #the VGG16 model
 vgg_top = conv_base.get_layer('block5_conv2').output
 
+input_1 = conv_base.get_layer('input_1').output
 block1_conv2 = conv_base.get_layer('block1_conv2').output
 block2_conv2 = conv_base.get_layer('block2_conv2').output
 block3_conv3 = conv_base.get_layer('block3_conv3').output
 block4_conv3 = conv_base.get_layer('block4_conv3').output
+block5_conv2 = conv_base.get_layer('block4_conv2').output
 
-start_neurons = 32 #mulipler for the neurons per layer
+neurons = 16 #filter size for the layers below
 
 # 8 to 16
-deconv4 = Conv2DTranspose(start_neurons * 8, (3,3), strides=(2, 2), padding='same')(vgg_top)
+deconv4 = Conv2DTranspose(neurons, (3,3), strides=(2, 2), padding='same', activation='relu')(vgg_top)
 uconv4 = concatenate([deconv4, block4_conv3])
-#uconv4 = Dropout(0.1)(uconv4)
-uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
-uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
-uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
+#uconv4 = Dropout(0.05)(uconv4)
+#uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
+#uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
+#uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
 
 # 16 -> 32
-deconv3 = Conv2DTranspose(start_neurons * 4, (3, 3), strides=(2, 2), padding="same")(uconv4)
+deconv3 = Conv2DTranspose(neurons, (3, 3), strides=(2, 2), padding="same", activation='relu')(uconv4)
 uconv3 = concatenate([deconv3, block3_conv3])
-#uconv3 = Dropout(0.1)(uconv3)
-uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
-uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
-uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
+#uconv3 = Dropout(0.05)(uconv3)
+#uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
+#uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
+#uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
 
 # 32 -> 64
-deconv2 = Conv2DTranspose(start_neurons * 2, (3, 3), strides=(2, 2), padding="same")(uconv3)
+deconv2 = Conv2DTranspose(neurons, (3, 3), strides=(2, 2), padding="same", activation='relu')(uconv3)
 uconv2 = concatenate([deconv2, block2_conv2])
-#uconv2 = Dropout(0.1)(uconv2)
-uconv2 = Conv2D(start_neurons * 2, (3, 3), activation="relu", padding="same")(uconv2)
-uconv2 = Conv2D(start_neurons * 2, (3, 3), activation="relu", padding="same")(uconv2)
+#uconv2 = Dropout(0.05)(uconv2)
+#uconv2 = Conv2D(start_neurons * 2, (3, 3), activation="relu", padding="same")(uconv2)
+#uconv2 = Conv2D(start_neurons * 2, (3, 3), activation="relu", padding="same")(uconv2)
 
 # 64 -> 128
-deconv1 = Conv2DTranspose(start_neurons * 1, (3, 3), strides=(2, 2), padding="same")(uconv2)
+deconv1 = Conv2DTranspose(neurons, (3, 3), strides=(2, 2), padding="same", activation='relu')(uconv2)
 uconv1 = concatenate([deconv1, block1_conv2])
-#uconv1 = Dropout(0.1)(uconv1)
-uconv1 = Conv2D(start_neurons * 1, (3, 3), activation="relu", padding="same")(uconv1)
-uconv1 = Conv2D(start_neurons * 1, (3, 3), activation="relu", padding="same")(uconv1)
+#uconv1 = Dropout(0.05)(uconv1)
+uconv1 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv1)
+uconv1 = concatenate([uconv1, input_1])
+#uconv1 = Conv2D(start_neurons * 1, (3, 3), activation="relu", padding="same")(uconv1)
 
 out = Conv2D(3,(1,1), padding='same', activation='sigmoid')(uconv1) #the ouput image
 
@@ -239,7 +241,7 @@ def SSIM(x,y):
     ssim /= K.clip(denom, K.epsilon(), np.inf)
     #ssim = tf.select(tf.is_nan(ssim), K.zeros_like(ssim), ssim)
 
-    return ssim
+    return K.mean((1.0 - ssim) / 2.0)
 
 #SSIM for red channel only
 def loss_SSIM_Red(y_true, y_pred):
@@ -295,6 +297,7 @@ def DSSIM(y_true, y_pred):
     #ssim = tf.select(tf.is_nan(ssim), K.zeros_like(ssim), ssim)
 
     #returns an error number where 0 is a perfect match
+    #return ssim
     return K.mean((1.0 - ssim) / 2.0)
 
 #custom loss were functions can be tested
@@ -310,25 +313,30 @@ def custom_loss(y_true, y_pred):
 
     #loss functions variations
     #dssim = K.mean((channels - total_ssim) / 2.0)
-    dssim = (channels - total_ssim)
+    custom_dssim = total_ssim
+    dssim = DSSIM(y_true, y_pred)
     eucli_dis = K.sqrt(K.sum(K.square(y_pred - y_true), axis=-1))
     mse_and_dssim = keras.losses.mean_squared_error(y_true, y_pred) + DSSIM(y_true, y_pred)
+    mse_and_total_dssim = keras.losses.mean_squared_error(y_true, y_pred) + total_ssim
 
     #return loss chosen
-    return (eucli_dis)
+    return (mse_and_total_dssim)
+
+new_optimizer = keras.optimizers.Adam(lr= 0.01, beta_1=0.9, beta_2=0.999, amsgrad=True)
+#lr=0.001 seems to work with mse_and_dssim loss
 
 model.compile(optimizer='adam', loss=custom_loss)
 
 #training area
 history = model.fit_generator(train_generator,
-                              steps_per_epoch=1, # TotalTrainingSamples / TrainingBatchSize
+                              steps_per_epoch=5, # Can be increased with one image. It will augument a new image every batch. Which is 1.
                               #validation_steps=10, # TotalvalidationSamples / ValidationBatchSize
                               #validation_data=validation_generator,
                               verbose=1,
-                              epochs=1000)
+                              epochs=2000)
 
 #Area to see how well the model performs on an image
-org_img = load_img('pool/org/x/org.0.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
+org_img = load_img('pool/org/x/org.6.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
 org_img = img_to_array(org_img)
 org_img /= 255
 org_img = np.expand_dims(org_img, axis=0)
@@ -340,13 +348,15 @@ output = deprocess_image(output)
 
 #make a sound when done and chart is ready
 import winsound
-frequency = 2500  # Set Frequency To 2500 Hertz
-duration = 1000  # Set Duration To 1000 ms == 1 second
-winsound.Beep(frequency, duration)
+# frequency = 2500  # Set Frequency To 2500 Hertz
+# duration = 1000  # Set Duration To 1000 ms == 1 second
+# winsound.Beep(frequency, duration)
+for i in range(3): #number of sounds to go off
+    winsound.PlaySound("SystemHand", winsound.SND_ALIAS)
 
 #show comparison orginal to networks generated
-org_img = load_img('pool/org/x/org.0.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
-edit_img = load_img('pool/edit/y/edit.0.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
+org_img = load_img('pool/org/x/org.6.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
+edit_img = load_img('pool/edit/y/edit.6.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
 imgs = plt.figure(figsize=(18, 6))
 imgs.add_subplot(1, 3, 1)
 plt.imshow(org_img)
@@ -355,5 +365,23 @@ plt.imshow(edit_img)
 imgs.add_subplot(1, 3, 3)
 plt.imshow(output)
 plt.show()
+
+def plot_history(history):
+
+    #refresh the plot and variables
+    plt.clf()
+    plt.cla()
+    plt.close()
+
+    loss = history.history['loss']
+    x = range(1, len(loss) + 1)
+
+    plt.figure(figsize=(6, 5))
+    plt.plot(x, loss, 'b', label='Training loss')
+    plt.title('Training loss')
+    plt.legend()
+    plt.show()
+
+plot_history(history)
 
 print("END")
