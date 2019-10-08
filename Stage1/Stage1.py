@@ -318,12 +318,15 @@ def custom_loss(y_true, y_pred):
     eucli_dis = K.sqrt(K.sum(K.square(y_pred - y_true), axis=-1))
     mse_and_dssim = keras.losses.mean_squared_error(y_true, y_pred) + DSSIM(y_true, y_pred)
     mse_and_total_dssim = keras.losses.mean_squared_error(y_true, y_pred) + total_ssim
+    eucli_dis_and_dssim = K.sqrt(K.sum(K.square(y_pred - y_true), axis=-1)) + DSSIM(y_true, y_pred)
+    eucli_dis_and_total_dssim = K.sqrt(K.sum(K.square(y_pred - y_true), axis=-1)) + total_ssim
+
 
     #return loss chosen
-    return (mse_and_total_dssim)
+    return (eucli_dis_and_dssim)
 
-new_optimizer = keras.optimizers.Adam(lr= 0.01, beta_1=0.9, beta_2=0.999, amsgrad=True)
-#lr=0.001 seems to work with mse_and_dssim loss
+new_optimizer = keras.optimizers.Adam(lr= 0.001, beta_1=0.9, beta_2=0.999, amsgrad=True)
+#lr=0.01 seems to work with mse_and_dssim loss but fail on mse_and_total_dssim
 
 model.compile(optimizer='adam', loss=custom_loss)
 
@@ -335,8 +338,10 @@ history = model.fit_generator(train_generator,
                               verbose=1,
                               epochs=2000)
 
+IMAGE_NUM = 17 #the image number to test in the foramat org.#.jpg or edit.#.jpg
+
 #Area to see how well the model performs on an image
-org_img = load_img('pool/org/x/org.6.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
+org_img = load_img('pool/org/x/org.{}.jpg'.format(IMAGE_NUM), target_size=(IMG_WIDTH,IMG_HEIGHT))
 org_img = img_to_array(org_img)
 org_img /= 255
 org_img = np.expand_dims(org_img, axis=0)
@@ -355,8 +360,8 @@ for i in range(3): #number of sounds to go off
     winsound.PlaySound("SystemHand", winsound.SND_ALIAS)
 
 #show comparison orginal to networks generated
-org_img = load_img('pool/org/x/org.6.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
-edit_img = load_img('pool/edit/y/edit.6.jpg', target_size=(IMG_WIDTH,IMG_HEIGHT))
+org_img = load_img('pool/org/x/org.{}.jpg'.format(IMAGE_NUM), target_size=(IMG_WIDTH,IMG_HEIGHT))
+edit_img = load_img('pool/edit/y/edit.{}.jpg'.format(IMAGE_NUM), target_size=(IMG_WIDTH,IMG_HEIGHT))
 imgs = plt.figure(figsize=(18, 6))
 imgs.add_subplot(1, 3, 1)
 plt.imshow(org_img)
