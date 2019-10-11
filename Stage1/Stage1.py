@@ -10,6 +10,7 @@ from keras.layers import Input, Conv2D, Conv2DTranspose, Dropout, concatenate
 from keras.models import Model
 from keras import backend as K
 from keras.regularizers import l2
+from PIL import Image
 
 #This is a U-net with VGG16 as the encoder, the goal is to train the network
 #to restores underwater images that suffer from underwater image degradation.
@@ -34,6 +35,19 @@ print(sess.run(c))
 #size of images for model input (make sure divisible by 8)
 IMG_HEIGHT = 400
 IMG_WIDTH = 400
+IMAGE_NUM = 16 #the image number to test in the foramat org.#.jpg or edit.#.jpg
+
+#checks if images are placed in the folders correctly
+org_img = img_to_array(load_img('pool/org/x/org.{}.jpg'.format(IMAGE_NUM)))
+edit_img = img_to_array(load_img('pool/edit/y/edit.{}.jpg'.format(IMAGE_NUM)))
+
+if org_img.shape != edit_img.shape:
+    print("Error: Image size does not match!")
+    print(org_img.shape)
+    print(edit_img.shape)
+    exit()
+
+
 
 def deprocess_image(x):
     """utility function to convert a float array into a valid uint8 image.
@@ -325,7 +339,7 @@ def custom_loss(y_true, y_pred):
     #return loss chosen
     return (eucli_dis_and_dssim)
 
-new_optimizer = keras.optimizers.Adam(lr= 0.001, beta_1=0.9, beta_2=0.999, amsgrad=True)
+new_optimizer = keras.optimizers.Adam(lr= 0.01, beta_1=0.9, beta_2=0.999, amsgrad=True)
 #lr=0.01 seems to work with mse_and_dssim loss but fail on mse_and_total_dssim
 
 model.compile(optimizer='adam', loss=custom_loss)
@@ -336,9 +350,7 @@ history = model.fit_generator(train_generator,
                               #validation_steps=10, # TotalvalidationSamples / ValidationBatchSize
                               #validation_data=validation_generator,
                               verbose=1,
-                              epochs=2000)
-
-IMAGE_NUM = 17 #the image number to test in the foramat org.#.jpg or edit.#.jpg
+                              epochs=5000)
 
 #Area to see how well the model performs on an image
 org_img = load_img('pool/org/x/org.{}.jpg'.format(IMAGE_NUM), target_size=(IMG_WIDTH,IMG_HEIGHT))
