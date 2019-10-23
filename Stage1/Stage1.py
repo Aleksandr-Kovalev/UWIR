@@ -35,7 +35,7 @@ print(sess.run(c))
 #size of images for model input (make sure divisible by 8)
 IMG_HEIGHT = 400
 IMG_WIDTH = 400
-IMAGE_NUM = 16 #the image number to test in the foramat org.#.jpg or edit.#.jpg
+IMAGE_NUM = 14 #the image number to test in the foramat org.#.jpg or edit.#.jpg
 
 #checks if images are placed in the folders correctly
 org_img = img_to_array(load_img('pool/org/x/org.{}.jpg'.format(IMAGE_NUM)))
@@ -46,8 +46,6 @@ if org_img.shape != edit_img.shape:
     print(org_img.shape)
     print(edit_img.shape)
     exit()
-
-
 
 def deprocess_image(x):
     """utility function to convert a float array into a valid uint8 image.
@@ -197,24 +195,24 @@ neurons = 16 #filter size for the layers below
 deconv4 = Conv2DTranspose(neurons, (3,3), strides=(2, 2), padding='same', activation='relu')(vgg_top)
 uconv4 = concatenate([deconv4, block4_conv3])
 #uconv4 = Dropout(0.05)(uconv4)
-#uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
-#uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
-#uconv4 = Conv2D(start_neurons * 8, (3, 3), activation='relu', padding='same')(uconv4)
+#uconv4 = Conv2D(neurons, (3, 3), activation='relu', padding='same')(uconv4)
+#uconv4 = Conv2D(neurons, (3, 3), activation='relu', padding='same')(uconv4)
+#uconv4 = Conv2D(neurons, (3, 3), activation='relu', padding='same')(uconv4)
 
 # 16 -> 32
 deconv3 = Conv2DTranspose(neurons, (3, 3), strides=(2, 2), padding="same", activation='relu')(uconv4)
 uconv3 = concatenate([deconv3, block3_conv3])
 #uconv3 = Dropout(0.05)(uconv3)
-#uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
-#uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
-#uconv3 = Conv2D(start_neurons * 4, (3, 3), activation="relu", padding="same")(uconv3)
+#uconv3 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv3)
+#uconv3 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv3)
+#uconv3 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv3)
 
 # 32 -> 64
 deconv2 = Conv2DTranspose(neurons, (3, 3), strides=(2, 2), padding="same", activation='relu')(uconv3)
 uconv2 = concatenate([deconv2, block2_conv2])
 #uconv2 = Dropout(0.05)(uconv2)
-#uconv2 = Conv2D(start_neurons * 2, (3, 3), activation="relu", padding="same")(uconv2)
-#uconv2 = Conv2D(start_neurons * 2, (3, 3), activation="relu", padding="same")(uconv2)
+#uconv2 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv2)
+#uconv2 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv2)
 
 # 64 -> 128
 deconv1 = Conv2DTranspose(neurons, (3, 3), strides=(2, 2), padding="same", activation='relu')(uconv2)
@@ -222,7 +220,7 @@ uconv1 = concatenate([deconv1, block1_conv2])
 #uconv1 = Dropout(0.05)(uconv1)
 uconv1 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv1)
 uconv1 = concatenate([uconv1, input_1])
-#uconv1 = Conv2D(start_neurons * 1, (3, 3), activation="relu", padding="same")(uconv1)
+#uconv1 = Conv2D(neurons, (3, 3), activation="relu", padding="same")(uconv1)
 
 out = Conv2D(3,(1,1), padding='same', activation='sigmoid')(uconv1) #the ouput image
 
@@ -335,7 +333,6 @@ def custom_loss(y_true, y_pred):
     eucli_dis_and_dssim = K.sqrt(K.sum(K.square(y_pred - y_true), axis=-1)) + DSSIM(y_true, y_pred)
     eucli_dis_and_total_dssim = K.sqrt(K.sum(K.square(y_pred - y_true), axis=-1)) + total_ssim
 
-
     #return loss chosen
     return (eucli_dis_and_dssim)
 
@@ -350,7 +347,7 @@ history = model.fit_generator(train_generator,
                               #validation_steps=10, # TotalvalidationSamples / ValidationBatchSize
                               #validation_data=validation_generator,
                               verbose=1,
-                              epochs=5000)
+                              epochs=1000)
 
 #Area to see how well the model performs on an image
 org_img = load_img('pool/org/x/org.{}.jpg'.format(IMAGE_NUM), target_size=(IMG_WIDTH,IMG_HEIGHT))
@@ -374,13 +371,65 @@ for i in range(3): #number of sounds to go off
 #show comparison orginal to networks generated
 org_img = load_img('pool/org/x/org.{}.jpg'.format(IMAGE_NUM), target_size=(IMG_WIDTH,IMG_HEIGHT))
 edit_img = load_img('pool/edit/y/edit.{}.jpg'.format(IMAGE_NUM), target_size=(IMG_WIDTH,IMG_HEIGHT))
+
+#histogram data section
+org_hist = img_to_array(org_img)
+org_hist = org_hist.astype(int)
+
+edit_hist = img_to_array(edit_img)
+edit_hist = edit_hist.astype(int)
+
+output_hist = img_to_array(output)
+output_hist = output_hist.astype(int)
+
+def dic_to_arr(dic):
+
+    arr = [0] * 256 #set size of array
+    for i in range(0, 255): #loop through each key for color code
+        if dic.get(i,False):
+            #print('pixel:{}, count:{}'.format(i, dic[i]))
+            arr[i] = dic[i]
+    #print(arr)
+    return arr
+
+def build_hist_array(arr):
+
+    color_map = [0, 256, 512, 768] #array for the split position for the colors in arr RGB
+    histogram = [0] * 768
+
+    for i in range(0,3):
+        arr_unique, arr_counts = np.unique(arr[:,:,i], return_counts=True)
+        arr_dict = dict(zip(arr_unique, arr_counts))
+        #print(arr_dict)
+        histogram[color_map[i]:color_map[i+1]] = dic_to_arr(arr_dict)
+
+    return histogram
+
+org_hist = build_hist_array(org_hist)
+edit_hist = build_hist_array(edit_hist)
+output_hist = build_hist_array(output_hist)
+
+
 imgs = plt.figure(figsize=(18, 6))
-imgs.add_subplot(1, 3, 1)
+imgs.add_subplot(2, 3, 1)
 plt.imshow(org_img)
-imgs.add_subplot(1, 3, 2)
+imgs.add_subplot(2, 3, 2)
 plt.imshow(edit_img)
-imgs.add_subplot(1, 3, 3)
+imgs.add_subplot(2, 3, 3)
 plt.imshow(output)
+imgs.add_subplot(2, 3, 4) #image histogram plot
+plt.plot(org_hist[0:256], color='r')
+plt.plot(org_hist[256:512], color='g')
+plt.plot(org_hist[512:768], color='b')
+imgs.add_subplot(2, 3, 5)  #image histogram plot
+plt.plot(edit_hist[0:256], color='r')
+plt.plot(edit_hist[256:512], color='g')
+plt.plot(edit_hist[512:768], color='b')
+imgs.add_subplot(2, 3, 6)  #image histogram plot
+plt.plot(output_hist[0:256], color='r')
+plt.plot(output_hist[256:512], color='g')
+plt.plot(output_hist[512:768], color='b')
+
 plt.show()
 
 def plot_history(history):
