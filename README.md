@@ -9,4 +9,6 @@ This Area is divided in Stages as the process goes on during development.
 
 Stage #1: The foundation and the internal structure of the network is finally functional. This stage will be focused on one set of photos, 1 edited and 1 orginal. This stage will also allow me to play with different settings and configurations to discover the best layout for the next stage.
 
-Current State: Best results yet. For the first time stage1 has a working layout that apears to work on a heavily augmented image. More tweaking needed.   
+Old: Best results yet. For the first time stage1 has a working layout that apears to work on a heavily augmented image. More tweaking needed.   
+
+Back at it
